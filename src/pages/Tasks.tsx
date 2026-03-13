@@ -55,20 +55,34 @@ export default function Tasks() {
   }
 
   async function fetchMetadata() {
-    const [rolesRes, areasRes] = await Promise.all([
-      supabase.from('roles').select('*'),
-      supabase.from('areas').select('*')
-    ]);
-    if (rolesRes.data) setRoles(rolesRes.data);
-    if (areasRes.data) setAreas(areasRes.data);
+    try {
+      const [rolesRes, areasRes] = await Promise.all([
+        supabase.from('roles').select('*'),
+        supabase.from('areas').select('*')
+      ]);
+      
+      if (rolesRes.error) console.error('Error fetching roles:', rolesRes.error);
+      if (areasRes.error) console.error('Error fetching areas:', areasRes.error);
+      
+      if (rolesRes.data) setRoles(rolesRes.data);
+      if (areasRes.data) setAreas(areasRes.data);
+    } catch (err) {
+      console.error('Metadata fetch failed:', err);
+    }
   }
 
   async function handleSaveTask() {
-    if (!editingTask?.title) return;
+    if (!editingTask?.title) {
+      alert('O título é obrigatório.');
+      return;
+    }
 
     const { id, ...taskData } = editingTask;
     
     // Ensure all fields are present or null
+    const selectedArea = areas.find(a => a.id === taskData.area_id);
+    const selectedRole = roles.find(r => r.id === taskData.role_id);
+
     const payload = {
       title: taskData.title,
       description: taskData.description || '',
@@ -76,8 +90,12 @@ export default function Tasks() {
       priority: taskData.priority || 'MEDIUM',
       assigned_to: taskData.assigned_to || null,
       role_id: taskData.role_id || null,
-      area_id: taskData.area_id || null
+      area_id: taskData.area_id || null,
+      area: selectedArea ? selectedArea.name : 'Geral', // Fallback para não dar erro de null
+      role: selectedRole ? selectedRole.name : 'USER'   // Fallback para não dar erro de null
     };
+
+    console.log('Saving task with payload:', payload);
 
     const { error } = id 
       ? await supabase.from('tasks').update(payload).eq('id', id)
@@ -88,7 +106,7 @@ export default function Tasks() {
       fetchTasks();
     } else {
       console.error('Error saving task:', error);
-      alert('Erro ao salvar tarefa. Verifique os campos e tente novamente.');
+      alert(`Erro ao salvar tarefa: ${error.message}\n\nVerifique se você executou os comandos SQL necessários no Supabase.`);
     }
   }
 
