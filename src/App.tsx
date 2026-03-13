@@ -8,6 +8,8 @@ import Tasks from './pages/Tasks';
 import DataStore from './pages/DataStore';
 import UserManagement from './pages/UserManagement';
 import PasswordChange from './pages/PasswordChange';
+import Chat from './pages/Chat';
+import Notes from './pages/Notes';
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -35,6 +37,8 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/tasks" element={<Tasks />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/notes" element={<Notes />} />
           <Route path="/datastore" element={<DataStore />} />
           {user.role === 'ADMIN_MASTER' && (
             <Route path="/users" element={<UserManagement />} />
