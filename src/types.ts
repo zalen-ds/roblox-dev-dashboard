@@ -41,6 +41,14 @@ export interface Task {
   created_at?: string;
 }
 
+export interface Group {
+  id: string;
+  name: string;
+  description: string;
+  created_at?: string;
+  members?: User[];
+}
+
 export interface Message {
   id: string;
   sender_username: string;
