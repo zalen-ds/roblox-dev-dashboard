@@ -91,8 +91,7 @@ export default function Tasks() {
       assigned_to: taskData.assigned_to || null,
       role_id: taskData.role_id || null,
       area_id: taskData.area_id || null,
-      area: selectedArea ? selectedArea.name : 'Geral', // Fallback para não dar erro de null
-      role: selectedRole ? selectedRole.name : 'USER'   // Fallback para não dar erro de null
+      area: selectedArea ? selectedArea.name : 'Geral' // Mantém apenas area que sabemos que existe
     };
 
     console.log('Saving task with payload:', payload);
