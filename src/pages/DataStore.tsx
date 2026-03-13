@@ -23,6 +23,15 @@ export default function DataStore() {
 
   useEffect(() => {
     fetchDataStore();
+
+    const subscription = supabase
+      .channel('datastore-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'datastore_entries' }, () => fetchDataStore())
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function fetchDataStore() {
