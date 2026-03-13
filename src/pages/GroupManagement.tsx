@@ -14,8 +14,11 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { logAction } from '../lib/logger';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function GroupManagement() {
+  const { user: currentUser } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,10 +62,17 @@ export default function GroupManagement() {
       ? await supabase.from('groups').update(data).eq('id', id)
       : await supabase.from('groups').insert([data]);
 
-    if (!error) {
+    if (!error && currentUser) {
+      await logAction(
+        id ? 'Grupo Atualizado' : 'Grupo Criado',
+        'GROUP',
+        `Grupo "${data.name}" ${id ? 'atualizado' : 'criado'} por ${currentUser.username}.`,
+        currentUser.id,
+        currentUser.username
+      );
       setEditingGroup(null);
       fetchData();
-    } else {
+    } else if (error) {
       console.error('Error saving group:', error);
     }
   }
@@ -70,7 +80,14 @@ export default function GroupManagement() {
   async function handleDeleteGroup(id: string) {
     if (!confirm('Tem certeza que deseja remover este grupo?')) return;
     const { error } = await supabase.from('groups').delete().eq('id', id);
-    if (!error) {
+    if (!error && currentUser) {
+      await logAction(
+        'Grupo Removido',
+        'GROUP',
+        `Grupo ID ${id} removido por ${currentUser.username}.`,
+        currentUser.id,
+        currentUser.username
+      );
       if (selectedGroup?.id === id) setSelectedGroup(null);
       fetchData();
     }
@@ -88,7 +105,14 @@ export default function GroupManagement() {
         .eq('group_id', selectedGroup.id)
         .eq('user_id', userId);
       
-      if (!error) {
+      if (!error && currentUser) {
+        await logAction(
+          'Membro Removido',
+          'GROUP',
+          `Usuário ID ${userId} removido do grupo "${selectedGroup.name}" por ${currentUser.username}.`,
+          currentUser.id,
+          currentUser.username
+        );
         setGroupMembers(prev => prev.filter(id => id !== userId));
       }
     } else {
@@ -96,7 +120,14 @@ export default function GroupManagement() {
         .from('group_members')
         .insert([{ group_id: selectedGroup.id, user_id: userId }]);
       
-      if (!error) {
+      if (!error && currentUser) {
+        await logAction(
+          'Membro Adicionado',
+          'GROUP',
+          `Usuário ID ${userId} adicionado ao grupo "${selectedGroup.name}" por ${currentUser.username}.`,
+          currentUser.id,
+          currentUser.username
+        );
         setGroupMembers(prev => [...prev, userId]);
       }
     }
