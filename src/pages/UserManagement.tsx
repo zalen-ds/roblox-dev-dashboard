@@ -31,12 +31,12 @@ export default function UserManagement() {
     // Real-time subscriptions
     const usersSub = supabase
       .channel('users-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchUsers())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchUsers(true))
       .subscribe();
 
     const userAreasSub = supabase
       .channel('user-areas-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_areas' }, () => fetchUsers())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_areas' }, () => fetchUsers(true))
       .subscribe();
 
     return () => {
@@ -45,14 +45,15 @@ export default function UserManagement() {
     };
   }, []);
 
-  async function fetchUsers() {
-    setIsLoading(true);
+  async function fetchUsers(silent = false) {
+    if (!silent) setIsLoading(true);
     const { data, error } = await supabase
       .from('users')
       .select(`
         *,
         user_areas (
-          area_id
+          area_id,
+          areas (*)
         )
       `)
       .order('username', { ascending: true });
@@ -60,11 +61,11 @@ export default function UserManagement() {
     if (!error && data) {
       const transformedUsers = data.map((u: any) => ({
         ...u,
-        areas: u.user_areas?.map((ua: any) => areas.find(a => a.id === ua.area_id)).filter(Boolean) || []
+        areas: u.user_areas?.map((ua: any) => ua.areas).filter(Boolean) || []
       }));
       setUsers(transformedUsers);
     }
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
   }
 
   async function fetchMetadata() {
@@ -108,6 +109,20 @@ export default function UserManagement() {
   }
 
   async function toggleArea(userId: string, areaId: string, isAssigned: boolean) {
+    const area = areas.find(a => a.id === areaId);
+    if (!area) return;
+
+    // Optimistic Update
+    setUsers(prev => prev.map(u => {
+      if (u.id === userId) {
+        const newAreas = isAssigned 
+          ? (u.areas || []).filter(a => a.id !== areaId)
+          : [...(u.areas || []), area];
+        return { ...u, areas: newAreas };
+      }
+      return u;
+    }));
+
     if (isAssigned) {
       const { error } = await supabase
         .from('user_areas')
@@ -115,13 +130,19 @@ export default function UserManagement() {
         .eq('user_id', userId)
         .eq('area_id', areaId);
       
-      if (!error) fetchUsers();
+      if (error) {
+        console.error('Error removing area:', error);
+        fetchUsers(); // Rollback on error
+      }
     } else {
       const { error } = await supabase
         .from('user_areas')
         .insert([{ user_id: userId, area_id: areaId }]);
       
-      if (!error) fetchUsers();
+      if (error) {
+        console.error('Error adding area:', error);
+        fetchUsers(); // Rollback on error
+      }
     }
   }
 
