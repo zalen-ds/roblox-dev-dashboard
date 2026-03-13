@@ -13,6 +13,9 @@ import {
   User as UserIcon
 } from 'lucide-react';
 
+import { cn } from '../lib/utils';
+import { logAction } from '../lib/logger';
+
 export default function DataStore() {
   const [items, setItems] = useState<DataStoreEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,6 +72,16 @@ export default function DataStore() {
         .eq('id', editingItem.id);
 
       if (updateError) throw updateError;
+
+      if (user) {
+        await logAction(
+          'DataStore Atualizado',
+          'SYSTEM',
+          `Dados do jogador ${editingItem.player_name} atualizados por ${user.username}.`,
+          user.id,
+          user.username
+        );
+      }
 
       setEditingItem(null);
       fetchDataStore();
