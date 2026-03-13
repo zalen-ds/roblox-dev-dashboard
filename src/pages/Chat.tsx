@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Message, User, Area } from '../types';
+import { Message, User, Area, Group } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Send, 
@@ -8,26 +8,29 @@ import {
   Users, 
   Terminal, 
   User as UserIcon, 
-  MoreVertical, 
   Edit2, 
   Trash2, 
   X, 
   Check,
   MessageSquare,
   Search,
-  Trash
+  Trash,
+  Hash
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type ChatType = 'global' | 'area' | 'private' | 'admin_all';
+type ChatType = 'global' | 'area' | 'private' | 'admin_all' | 'group';
 
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatType, setChatType] = useState<ChatType>('global');
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [allAreas, setAllAreas] = useState<Area[]>([]);
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
@@ -38,27 +41,39 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isAdmin = user?.role === 'ADMIN_MASTER';
 
-  // Initialize selectedAreaId if user has areas
   useEffect(() => {
-    if (user?.areas && user.areas.length > 0 && !selectedAreaId) {
-      setSelectedAreaId(user.areas[0].id);
-    }
+    fetchMetadata();
     fetchUsers();
   }, [user]);
+
+  async function fetchMetadata() {
+    if (!user) return;
+
+    const [areasRes, groupsRes] = await Promise.all([
+      supabase.from('areas').select('*'),
+      isAdmin 
+        ? supabase.from('groups').select('*')
+        : supabase.from('groups').select('*, group_members!inner(*)').eq('group_members.user_id', user.id)
+    ]);
+
+    if (areasRes.data) setAllAreas(areasRes.data);
+    if (groupsRes.data) setUserGroups(groupsRes.data);
+  }
 
   async function fetchUsers() {
     const { data } = await supabase.from('users').select('*').eq('status', 'APPROVED');
     if (data) setAllUsers(data);
   }
 
-  const currentArea = user?.areas?.find(a => a.id === selectedAreaId);
+  const currentArea = allAreas.find(a => a.id === selectedAreaId);
+  const currentGroup = userGroups.find(g => g.id === selectedGroupId);
   const currentTargetUser = allUsers.find(u => u.id === selectedUserId);
 
   const getChannelName = () => {
     if (chatType === 'global') return 'global';
-    if (chatType === 'area') return currentArea?.name || 'Geral';
+    if (chatType === 'area') return `area:${selectedAreaId}`;
+    if (chatType === 'group') return `group:${selectedGroupId}`;
     if (chatType === 'private' && selectedUserId && user) {
-      // Consistent private channel name: private:smallerId:largerId
       const ids = [user.id, selectedUserId].sort();
       return `private:${ids[0]}:${ids[1]}`;
     }
@@ -80,7 +95,6 @@ export default function Chat() {
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const msg = payload.new as Message;
-          // Check if message belongs to current view
           const belongs = chatType === 'admin_all' || msg.channel === currentChannel;
           if (belongs) {
             setMessages(prev => {
@@ -191,6 +205,11 @@ export default function Chat() {
     u.id !== user?.id && u.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Filter areas based on user membership (unless Admin)
+  const accessibleAreas = isAdmin 
+    ? allAreas 
+    : allAreas.filter(area => user?.areas?.some(ua => ua.id === area.id));
+
   return (
     <div className="h-screen flex bg-black overflow-hidden">
       {/* Sidebar */}
@@ -218,7 +237,7 @@ export default function Chat() {
                 Global
               </button>
               
-              {user?.areas?.map(area => (
+              {accessibleAreas.map(area => (
                 <button
                   key={area.id}
                   onClick={() => {
@@ -234,6 +253,30 @@ export default function Chat() {
                   {area.name}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Custom Groups */}
+          <div>
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">Grupos</h3>
+            <div className="space-y-1">
+              {userGroups.map(group => (
+                <button
+                  key={group.id}
+                  onClick={() => {
+                    setChatType('group');
+                    setSelectedGroupId(group.id);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                    chatType === 'group' && selectedGroupId === group.id ? "bg-emerald-500 text-black font-bold" : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  )}
+                >
+                  <Hash className="w-4 h-4" />
+                  {group.name}
+                </button>
+              ))}
+              {userGroups.length === 0 && <p className="text-[10px] text-slate-600 px-3 italic">Nenhum grupo.</p>}
             </div>
           </div>
 
@@ -300,6 +343,7 @@ export default function Chat() {
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
               {chatType === 'global' && <Globe className="w-6 h-6 text-emerald-500" />}
               {chatType === 'area' && <Users className="w-6 h-6 text-emerald-500" />}
+              {chatType === 'group' && <Hash className="w-6 h-6 text-emerald-500" />}
               {chatType === 'private' && <UserIcon className="w-6 h-6 text-emerald-500" />}
               {chatType === 'admin_all' && <Terminal className="w-6 h-6 text-red-500" />}
             </div>
@@ -307,6 +351,7 @@ export default function Chat() {
               <h1 className="text-xl font-bold text-white">
                 {chatType === 'global' && 'Canal Global'}
                 {chatType === 'area' && `Área: ${currentArea?.name || 'Geral'}`}
+                {chatType === 'group' && `Grupo: ${currentGroup?.name}`}
                 {chatType === 'private' && `Chat com ${currentTargetUser?.username}`}
                 {chatType === 'admin_all' && 'Monitoramento Global (Admin)'}
               </h1>
@@ -352,7 +397,6 @@ export default function Chat() {
             </div>
           ) : messages.map((msg) => {
             const isOwn = msg.sender_username === user?.username;
-            const canManage = isOwn || isAdmin;
             const isSelected = selectedMessages.includes(msg.id);
 
             return (
