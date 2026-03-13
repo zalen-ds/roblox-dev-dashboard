@@ -19,7 +19,12 @@ export default function Login() {
     try {
       const { data, error: fetchError } = await supabase
         .from('users')
-        .select('*')
+        .select(`
+          *,
+          user_areas (
+            areas (*)
+          )
+        `)
         .eq('username', username)
         .eq('password', password)
         .single();
@@ -27,7 +32,12 @@ export default function Login() {
       if (fetchError || !data) {
         setError('Usuário ou senha incorretos.');
       } else {
-        const user = data as User;
+        const userData = data as any;
+        const user: User = {
+          ...userData,
+          areas: userData.user_areas?.map((ua: any) => ua.areas).filter(Boolean) || []
+        };
+
         if (user.status === 'PENDING') {
           setError('Sua conta está pendente de aprovação.');
         } else if (user.status === 'DENIED') {
