@@ -11,6 +11,7 @@ import {
   Clock
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { logAction } from '../lib/logger';
 
 export default function Notes() {
   const [note, setNote] = useState<Note | null>(null);
@@ -84,6 +85,15 @@ export default function Notes() {
       : await supabase.from('notes').insert([noteData]);
     
     if (!error) {
+      if (user) {
+        await logAction(
+          'Notas Atualizadas',
+          'SYSTEM',
+          `Notas de ${selectedUsername} atualizadas por ${user.username}.`,
+          user.id,
+          user.username
+        );
+      }
       fetchNote(selectedUserId);
     }
     setIsSaving(false);
