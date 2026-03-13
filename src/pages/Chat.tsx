@@ -9,23 +9,38 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [channel, setChannel] = useState<'global' | 'area'>('global');
+  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const currentChannel = channel === 'global' ? 'global' : user?.area || 'Geral';
+  // Initialize selectedAreaId if user has areas
+  useEffect(() => {
+    if (user?.areas && user.areas.length > 0 && !selectedAreaId) {
+      setSelectedAreaId(user.areas[0].id);
+    }
+  }, [user, selectedAreaId]);
+
+  const currentChannel = channel === 'global' 
+    ? 'global' 
+    : user?.areas?.find(a => a.id === selectedAreaId)?.name || 'Geral';
 
   useEffect(() => {
     fetchMessages();
 
     const subscription = supabase
-      .channel('messages')
+      .channel(`messages:${currentChannel}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'messages',
         filter: `channel=eq.${currentChannel}`
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new as Message]);
+        const newMessage = payload.new as Message;
+        setMessages(prev => {
+          // Avoid duplicates from optimistic updates
+          if (prev.some(m => m.id === newMessage.id)) return prev;
+          return [...prev, newMessage];
+        });
       })
       .subscribe();
 
@@ -44,7 +59,7 @@ export default function Chat() {
       .select('*')
       .eq('channel', currentChannel)
       .order('created_at', { ascending: true })
-      .limit(50);
+      .limit(100);
     
     if (data) setMessages(data);
   }
@@ -53,19 +68,45 @@ export default function Chat() {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
 
-    const messageData = {
+    const content = newMessage.trim();
+    setNewMessage('');
+
+    // Optimistic update
+    const tempId = crypto.randomUUID();
+    const optimisticMessage: Message = {
+      id: tempId,
       sender_username: user.username,
-      content: newMessage.trim(),
-      channel: currentChannel
+      content: content,
+      channel: currentChannel,
+      created_at: new Date().toISOString()
     };
 
-    const { error } = await supabase.from('messages').insert([messageData]);
-    if (!error) setNewMessage('');
+    setMessages(prev => [...prev, optimisticMessage]);
+
+    const { error, data } = await supabase
+      .from('messages')
+      .insert([{
+        sender_username: user.username,
+        content: content,
+        channel: currentChannel
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error sending message:', error);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      alert('Erro ao enviar mensagem.');
+    } else if (data) {
+      // Replace optimistic message with real one to get correct ID and timestamp
+      setMessages(prev => prev.map(m => m.id === tempId ? data as Message : m));
+    }
   }
 
   return (
     <div className="h-screen flex flex-col bg-black">
-      <header className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+      <header className="p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between bg-slate-900/50 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Terminal className="w-6 h-6 text-emerald-500" />
@@ -74,27 +115,41 @@ export default function Chat() {
           <p className="text-slate-400 text-sm mt-1">Chat em tempo real para a equipe.</p>
         </div>
         
-        <div className="flex bg-black p-1 rounded-lg border border-slate-800">
-          <button
-            onClick={() => setChannel('global')}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
-              channel === 'global' ? "bg-emerald-500 text-black" : "text-slate-400 hover:text-white"
-            )}
-          >
-            <Globe className="w-4 h-4" />
-            Global
-          </button>
-          <button
-            onClick={() => setChannel('area')}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
-              channel === 'area' ? "bg-emerald-500 text-black" : "text-slate-400 hover:text-white"
-            )}
-          >
-            <Users className="w-4 h-4" />
-            Área ({user?.area})
-          </button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex bg-black p-1 rounded-lg border border-slate-800">
+            <button
+              onClick={() => setChannel('global')}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                channel === 'global' ? "bg-emerald-500 text-black" : "text-slate-400 hover:text-white"
+              )}
+            >
+              <Globe className="w-4 h-4" />
+              Global
+            </button>
+            <button
+              onClick={() => setChannel('area')}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                channel === 'area' ? "bg-emerald-500 text-black" : "text-slate-400 hover:text-white"
+              )}
+            >
+              <Users className="w-4 h-4" />
+              Área
+            </button>
+          </div>
+
+          {channel === 'area' && user?.areas && user.areas.length > 0 && (
+            <select
+              value={selectedAreaId || ''}
+              onChange={(e) => setSelectedAreaId(e.target.value)}
+              className="bg-black border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+            >
+              {user.areas.map(area => (
+                <option key={area.id} value={area.id}>{area.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       </header>
 
