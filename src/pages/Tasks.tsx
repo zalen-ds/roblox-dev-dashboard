@@ -16,8 +16,11 @@ import {
   Shield
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { logAction } from '../lib/logger';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Tasks() {
+  const { user: currentUser } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -117,6 +120,15 @@ export default function Tasks() {
       : await supabase.from('tasks').insert([payload]);
     
     if (!error) {
+      if (currentUser) {
+        await logAction(
+          id ? 'Tarefa Atualizada' : 'Tarefa Criada',
+          'SYSTEM',
+          `Tarefa "${payload.title}" ${id ? 'atualizada' : 'criada'} por ${currentUser.username}. Status: ${payload.status}, Prioridade: ${payload.priority}`,
+          currentUser.id,
+          currentUser.username
+        );
+      }
       setEditingTask(null);
       fetchTasks();
     } else {
