@@ -1,16 +1,30 @@
-export type UserRole = 'ADMIN_MASTER' | 'DEVELOPER' | 'MODELER' | 'UI_DESIGNER' | 'USER';
 export type UserStatus = 'PENDING' | 'APPROVED' | 'DENIED';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
-export type UserArea = 'Scripting' | 'Building' | 'UI' | 'Management' | 'Geral';
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  created_at?: string;
+}
+
+export interface Area {
+  id: string;
+  name: string;
+  description: string;
+  created_at?: string;
+}
 
 export interface User {
   id: string;
   username: string;
   password?: string;
   status: UserStatus;
-  role: UserRole;
-  area: UserArea;
+  role: string; // Name of the role
+  area: string; // Name of the area
+  role_id?: string;
+  area_id?: string;
   can_edit_db: boolean;
   needs_password_change: boolean;
   created_at?: string;
@@ -23,6 +37,8 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   assigned_to: string | null;
+  role_id: string | null;
+  area_id: string | null;
   created_at?: string;
 }
 
