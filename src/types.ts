@@ -44,8 +44,11 @@ export interface Task {
 export interface Message {
   id: string;
   sender_username: string;
+  sender_id?: string;
+  receiver_id?: string | null;
   content: string;
   channel: string;
+  is_edited?: boolean;
   created_at: string;
 }
 
