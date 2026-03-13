@@ -8,7 +8,8 @@ import {
   Database, 
   LogOut,
   Terminal,
-  MessageSquare
+  MessageSquare,
+  History
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -27,6 +28,7 @@ export default function Sidebar() {
     navItems.push({ to: '/users', icon: Users, label: 'Usuários' });
     navItems.push({ to: '/team-settings', icon: Terminal, label: 'Equipe' });
     navItems.push({ to: '/groups', icon: MessageSquare, label: 'Grupos' });
+    navItems.push({ to: '/logs', icon: History, label: 'Logs' });
   }
 
   return (
