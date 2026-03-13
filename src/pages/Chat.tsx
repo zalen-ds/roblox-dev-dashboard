@@ -18,6 +18,7 @@ import {
   Hash
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { logAction } from '../lib/logger';
 
 type ChatType = 'global' | 'area' | 'private' | 'admin_all' | 'group';
 
@@ -36,6 +37,8 @@ export default function Chat() {
   const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showMembers, setShowMembers] = useState(true);
+  const [channelMembers, setChannelMembers] = useState<User[]>([]);
   
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,6 +88,7 @@ export default function Chat() {
 
   useEffect(() => {
     fetchMessages();
+    fetchChannelMembers();
 
     const subscription = supabase
       .channel(`messages:${currentChannel}`)
@@ -135,6 +139,26 @@ export default function Chat() {
     if (data) setMessages(data);
   }
 
+  async function fetchChannelMembers() {
+    if (chatType === 'global' || chatType === 'admin_all') {
+      setChannelMembers(allUsers);
+    } else if (chatType === 'area' && selectedAreaId) {
+      const { data } = await supabase
+        .from('user_areas')
+        .select('users(*)')
+        .eq('area_id', selectedAreaId);
+      if (data) setChannelMembers(data.map((d: any) => d.users).filter(Boolean));
+    } else if (chatType === 'group' && selectedGroupId) {
+      const { data } = await supabase
+        .from('group_members')
+        .select('users(*)')
+        .eq('group_id', selectedGroupId);
+      if (data) setChannelMembers(data.map((d: any) => d.users).filter(Boolean));
+    } else if (chatType === 'private' && selectedUserId && user) {
+      setChannelMembers(allUsers.filter(u => u.id === user.id || u.id === selectedUserId));
+    }
+  }
+
   async function handleSendMessage(e: React.FormEvent) {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
@@ -162,8 +186,19 @@ export default function Chat() {
   }
 
   async function handleDeleteMessage(id: string) {
+    const msg = messages.find(m => m.id === id);
     const { error } = await supabase.from('messages').delete().eq('id', id);
-    if (error) alert('Erro ao deletar mensagem.');
+    if (!error && user) {
+      await logAction(
+        'Mensagem Deletada', 
+        'CHAT', 
+        `Mensagem de ${msg?.sender_username} deletada por ${user.username}. Conteúdo: ${msg?.content}`, 
+        user.id, 
+        user.username
+      );
+    } else if (error) {
+      alert('Erro ao deletar mensagem.');
+    }
   }
 
   async function handleBulkDelete() {
@@ -171,10 +206,17 @@ export default function Chat() {
     if (!confirm(`Deseja deletar ${selectedMessages.length} mensagens?`)) return;
 
     const { error } = await supabase.from('messages').delete().in('id', selectedMessages);
-    if (!error) {
+    if (!error && user) {
+      await logAction(
+        'Deleção em Massa', 
+        'CHAT', 
+        `${selectedMessages.length} mensagens deletadas por ${user.username}.`, 
+        user.id, 
+        user.username
+      );
       setSelectedMessages([]);
       setIsBulkMode(false);
-    } else {
+    } else if (error) {
       alert('Erro ao deletar mensagens em massa.');
     }
   }
@@ -188,6 +230,15 @@ export default function Chat() {
       .eq('id', editingMessageId);
 
     if (!error) {
+      if (user) {
+        await logAction(
+          'Mensagem Editada',
+          'CHAT',
+          `Mensagem ID ${editingMessageId} editada por ${user.username}. Novo conteúdo: ${editContent.trim()}`,
+          user.id,
+          user.username
+        );
+      }
       setEditingMessageId(null);
       setEditContent('');
     } else {
@@ -362,6 +413,16 @@ export default function Chat() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowMembers(!showMembers)}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                showMembers ? "bg-emerald-500/10 text-emerald-500" : "text-slate-400 hover:text-white"
+              )}
+              title="Ver Membros"
+            >
+              <Users className="w-5 h-5" />
+            </button>
             {isAdmin && (
               <button
                 onClick={() => {
@@ -516,6 +577,48 @@ export default function Chat() {
           </form>
         )}
       </main>
+
+      {/* Right Sidebar - Members */}
+      {showMembers && (
+        <aside className="w-64 border-l border-slate-800 bg-slate-900/30 flex flex-col hidden xl:flex">
+          <div className="p-6 border-b border-slate-800">
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Membros — {channelMembers.length}</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {channelMembers.map(member => (
+              <div key={member.id} className="flex items-center justify-between group/member">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300">
+                      {member.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div className={cn(
+                      "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-black",
+                      member.status === 'APPROVED' ? "bg-emerald-500" : "bg-slate-600"
+                    )} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">{member.username}</p>
+                    <p className="text-[10px] text-slate-500 uppercase">{member.role}</p>
+                  </div>
+                </div>
+                
+                {isAdmin && member.id !== user?.id && (
+                  <div className="opacity-0 group-hover/member:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => window.location.href = `/users?search=${member.username}`}
+                      className="p-1.5 hover:bg-slate-800 text-slate-500 hover:text-emerald-500 rounded-lg"
+                      title="Gerenciar Usuário"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
