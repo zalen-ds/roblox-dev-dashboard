@@ -10,6 +10,7 @@ import UserManagement from './pages/UserManagement';
 import PasswordChange from './pages/PasswordChange';
 import Chat from './pages/Chat';
 import Notes from './pages/Notes';
+import TeamSettings from './pages/TeamSettings';
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -41,7 +42,10 @@ function AppRoutes() {
           <Route path="/notes" element={<Notes />} />
           <Route path="/datastore" element={<DataStore />} />
           {user.role === 'ADMIN_MASTER' && (
-            <Route path="/users" element={<UserManagement />} />
+            <>
+              <Route path="/users" element={<UserManagement />} />
+              <Route path="/team-settings" element={<TeamSettings />} />
+            </>
           )}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
