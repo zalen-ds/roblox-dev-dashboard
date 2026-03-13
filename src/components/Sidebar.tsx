@@ -24,6 +24,7 @@ export default function Sidebar() {
 
   if (user?.role === 'ADMIN_MASTER') {
     navItems.push({ to: '/users', icon: Users, label: 'Usuários' });
+    navItems.push({ to: '/team-settings', icon: Terminal, label: 'Equipe' });
   }
 
   return (
