@@ -12,6 +12,7 @@ import Chat from './pages/Chat';
 import Notes from './pages/Notes';
 import TeamSettings from './pages/TeamSettings';
 import GroupManagement from './pages/GroupManagement';
+import Logs from './pages/Logs';
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -47,6 +48,7 @@ function AppRoutes() {
               <Route path="/users" element={<UserManagement />} />
               <Route path="/team-settings" element={<TeamSettings />} />
               <Route path="/groups" element={<GroupManagement />} />
+            <Route path="/logs" element={<Logs />} />
             </>
           )}
           <Route path="*" element={<Navigate to="/" replace />} />
