@@ -22,9 +22,8 @@ export interface User {
   password?: string;
   status: UserStatus;
   role: string; // Name of the role
-  area: string; // Name of the area
   role_id?: string;
-  area_id?: string;
+  areas?: Area[]; // Multiple areas
   can_edit_db: boolean;
   needs_password_change: boolean;
   created_at?: string;
