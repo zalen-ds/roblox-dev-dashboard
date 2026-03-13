@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { User } from '../types';
+import { User, Role, Area } from '../types';
 import { generateRandomPassword } from '../lib/utils';
 import { 
   UserPlus, 
@@ -10,17 +10,22 @@ import {
   Check, 
   X,
   Copy,
-  Search
+  Search,
+  Shield,
+  Layers
 } from 'lucide-react';
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [resetModal, setResetModal] = useState<{ isOpen: boolean, username: string, password?: string }>({ isOpen: false, username: '' });
 
   useEffect(() => {
     fetchUsers();
+    fetchMetadata();
   }, []);
 
   async function fetchUsers() {
@@ -36,6 +41,15 @@ export default function UserManagement() {
     setIsLoading(false);
   }
 
+  async function fetchMetadata() {
+    const [rolesRes, areasRes] = await Promise.all([
+      supabase.from('roles').select('*'),
+      supabase.from('areas').select('*')
+    ]);
+    if (rolesRes.data) setRoles(rolesRes.data);
+    if (areasRes.data) setAreas(areasRes.data);
+  }
+
   async function handleStatusChange(userId: string, status: User['status']) {
     const { error } = await supabase
       .from('users')
@@ -47,25 +61,31 @@ export default function UserManagement() {
     }
   }
 
-  async function handleRoleChange(userId: string, role: User['role']) {
+  async function handleRoleChange(userId: string, roleId: string) {
+    const role = roles.find(r => r.id === roleId);
+    if (!role) return;
+
     const { error } = await supabase
       .from('users')
-      .update({ role })
+      .update({ role_id: roleId, role: role.name })
       .eq('id', userId);
     
     if (!error) {
-      setUsers(users.map(u => u.id === userId ? { ...u, role } : u));
+      setUsers(users.map(u => u.id === userId ? { ...u, role_id: roleId, role: role.name } : u));
     }
   }
 
-  async function handleAreaChange(userId: string, area: User['area']) {
+  async function handleAreaChange(userId: string, areaId: string) {
+    const area = areas.find(a => a.id === areaId);
+    if (!area) return;
+
     const { error } = await supabase
       .from('users')
-      .update({ area })
+      .update({ area_id: areaId, area: area.name })
       .eq('id', userId);
     
     if (!error) {
-      setUsers(users.map(u => u.id === userId ? { ...u, area } : u));
+      setUsers(users.map(u => u.id === userId ? { ...u, area_id: areaId, area: area.name } : u));
     }
   }
 
@@ -141,28 +161,22 @@ export default function UserManagement() {
                 </td>
                 <td className="px-6 py-4">
                   <select
-                    value={u.role}
-                    onChange={(e) => handleRoleChange(u.id, e.target.value as User['role'])}
+                    value={u.role_id || ''}
+                    onChange={(e) => handleRoleChange(u.id, e.target.value)}
                     className="bg-black border border-slate-800 rounded px-2 py-1 text-[10px] font-bold uppercase text-emerald-500 focus:outline-none"
                   >
-                    <option value="ADMIN_MASTER">ADMIN MASTER</option>
-                    <option value="DEVELOPER">DEVELOPER</option>
-                    <option value="MODELER">MODELER</option>
-                    <option value="UI_DESIGNER">UI DESIGNER</option>
-                    <option value="USER">USER</option>
+                    <option value="">SEM CARGO</option>
+                    {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </td>
                 <td className="px-6 py-4">
                   <select
-                    value={u.area}
-                    onChange={(e) => handleAreaChange(u.id, e.target.value as User['area'])}
+                    value={u.area_id || ''}
+                    onChange={(e) => handleAreaChange(u.id, e.target.value)}
                     className="bg-black border border-slate-800 rounded px-2 py-1 text-[10px] font-bold uppercase text-blue-500 focus:outline-none"
                   >
-                    <option value="Scripting">Scripting</option>
-                    <option value="Building">Building</option>
-                    <option value="UI">UI</option>
-                    <option value="Management">Management</option>
-                    <option value="Geral">Geral</option>
+                    <option value="">SEM ÁREA</option>
+                    {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </td>
                 <td className="px-6 py-4">
@@ -192,7 +206,7 @@ export default function UserManagement() {
                         </button>
                         <button 
                           onClick={() => handleStatusChange(u.id, 'DENIED')}
-                          className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors"
+                          className="p-2 hover:bg-red-500/10 text-red-400 rounded-lg transition-colors"
                           title="Negar"
                         >
                           <X className="w-4 h-4" />
