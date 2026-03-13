@@ -12,7 +12,12 @@ import {
   Info
 } from 'lucide-react';
 
+import { cn } from '../lib/utils';
+import { logAction } from '../lib/logger';
+import { useAuth } from '../contexts/AuthContext';
+
 export default function TeamSettings() {
+  const { user } = useAuth();
   const [roles, setRoles] = useState<Role[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,6 +59,15 @@ export default function TeamSettings() {
       : await supabase.from('roles').insert([data]);
 
     if (!error) {
+      if (user) {
+        await logAction(
+          id ? 'Cargo Atualizado' : 'Cargo Criado',
+          'TEAM',
+          `Cargo "${data.name}" ${id ? 'atualizado' : 'criado'} por ${user.username}.`,
+          user.id,
+          user.username
+        );
+      }
       setEditingRole(null);
       fetchData();
     } else {
@@ -71,6 +85,15 @@ export default function TeamSettings() {
       : await supabase.from('areas').insert([data]);
 
     if (!error) {
+      if (user) {
+        await logAction(
+          id ? 'Área Atualizada' : 'Área Criada',
+          'TEAM',
+          `Área "${data.name}" ${id ? 'atualizada' : 'criada'} por ${user.username}.`,
+          user.id,
+          user.username
+        );
+      }
       setEditingArea(null);
       fetchData();
     } else {
@@ -82,13 +105,35 @@ export default function TeamSettings() {
   async function handleDeleteRole(id: string) {
     if (!confirm('Tem certeza que deseja remover este cargo? Isso pode afetar usuários vinculados.')) return;
     const { error } = await supabase.from('roles').delete().eq('id', id);
-    if (!error) fetchData();
+    if (!error) {
+      if (user) {
+        await logAction(
+          'Cargo Removido',
+          'TEAM',
+          `Cargo ID ${id} removido por ${user.username}.`,
+          user.id,
+          user.username
+        );
+      }
+      fetchData();
+    }
   }
 
   async function handleDeleteArea(id: string) {
     if (!confirm('Tem certeza que deseja remover esta área? Isso pode afetar tarefas vinculadas.')) return;
     const { error } = await supabase.from('areas').delete().eq('id', id);
-    if (!error) fetchData();
+    if (!error) {
+      if (user) {
+        await logAction(
+          'Área Removida',
+          'TEAM',
+          `Área ID ${id} removida por ${user.username}.`,
+          user.id,
+          user.username
+        );
+      }
+      fetchData();
+    }
   }
 
   return (
