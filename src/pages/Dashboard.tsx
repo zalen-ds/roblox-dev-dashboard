@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Task, User, DataStoreItem } from '../types';
+import { Task, User, DataStoreEntry } from '../types';
 import { 
   Users, 
   CheckSquare, 
@@ -28,7 +28,7 @@ export default function Dashboard() {
       ] = await Promise.all([
         supabase.from('users').select('*', { count: 'exact', head: true }),
         supabase.from('tasks').select('*', { count: 'exact', head: true }),
-        supabase.from('datastore').select('*', { count: 'exact', head: true }),
+        supabase.from('datastore_entries').select('*', { count: 'exact', head: true }),
         supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'TODO')
       ]);
 
