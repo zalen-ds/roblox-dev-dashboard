@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Task, TaskStatus, TaskPriority, User } from '../types';
+import { Task, TaskStatus, TaskPriority, User, Role, Area } from '../types';
 import { 
   Plus, 
   Clock, 
@@ -10,19 +10,27 @@ import {
   X,
   User as UserIcon,
   AlertTriangle,
-  AlignLeft
+  AlignLeft,
+  Filter,
+  Layers,
+  Shield
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Partial<Task> | null>(null);
+  const [filterArea, setFilterArea] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<string>('all');
 
   useEffect(() => {
     fetchTasks();
     fetchUsers();
+    fetchMetadata();
   }, []);
 
   async function fetchTasks() {
@@ -46,19 +54,49 @@ export default function Tasks() {
     if (data) setUsers(data as User[]);
   }
 
+  async function fetchMetadata() {
+    const [rolesRes, areasRes] = await Promise.all([
+      supabase.from('roles').select('*'),
+      supabase.from('areas').select('*')
+    ]);
+    if (rolesRes.data) setRoles(rolesRes.data);
+    if (areasRes.data) setAreas(areasRes.data);
+  }
+
   async function handleSaveTask() {
-    if (!editingTask) return;
+    if (!editingTask?.title) return;
 
     const { id, ...taskData } = editingTask;
+    
+    // Ensure all fields are present or null
+    const payload = {
+      title: taskData.title,
+      description: taskData.description || '',
+      status: taskData.status || 'TODO',
+      priority: taskData.priority || 'MEDIUM',
+      assigned_to: taskData.assigned_to || null,
+      role_id: taskData.role_id || null,
+      area_id: taskData.area_id || null
+    };
+
     const { error } = id 
-      ? await supabase.from('tasks').update(taskData).eq('id', id)
-      : await supabase.from('tasks').insert([taskData]);
+      ? await supabase.from('tasks').update(payload).eq('id', id)
+      : await supabase.from('tasks').insert([payload]);
     
     if (!error) {
       setEditingTask(null);
       fetchTasks();
+    } else {
+      console.error('Error saving task:', error);
+      alert('Erro ao salvar tarefa. Verifique os campos e tente novamente.');
     }
   }
+
+  const filteredTasks = tasks.filter(task => {
+    const areaMatch = filterArea === 'all' || task.area_id === filterArea;
+    const roleMatch = filterRole === 'all' || task.role_id === filterRole;
+    return areaMatch && roleMatch;
+  });
 
   const statusIcons = {
     TODO: Circle,
@@ -74,27 +112,53 @@ export default function Tasks() {
 
   return (
     <div className="p-8">
-      <header className="flex justify-between items-center mb-8">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-white">Tarefas de Desenvolvimento</h1>
           <p className="text-slate-400 mt-2">Acompanhe e atribua tarefas para a equipe.</p>
         </div>
-        <button 
-          onClick={() => setEditingTask({ id: '', title: '', description: '', status: 'TODO', priority: 'MEDIUM', assigned_to: null })}
-          className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Nova Tarefa
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2">
+            <Filter className="w-4 h-4 text-slate-500" />
+            <select 
+              value={filterArea}
+              onChange={(e) => setFilterArea(e.target.value)}
+              className="bg-transparent text-sm text-slate-300 focus:outline-none"
+            >
+              <option value="all">Todas Áreas</option>
+              {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2">
+            <Shield className="w-4 h-4 text-slate-500" />
+            <select 
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value)}
+              className="bg-transparent text-sm text-slate-300 focus:outline-none"
+            >
+              <option value="all">Todos Cargos</option>
+              {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
+          <button 
+            onClick={() => setEditingTask({ title: '', description: '', status: 'TODO', priority: 'MEDIUM', assigned_to: null, role_id: null, area_id: null })}
+            className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Nova Tarefa
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
           <div className="col-span-full text-center py-12 text-slate-500">Carregando tarefas...</div>
-        ) : tasks.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-slate-500">Nenhuma tarefa encontrada.</div>
-        ) : tasks.map((task) => {
+        ) : filteredTasks.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-slate-500">Nenhuma tarefa encontrada para os filtros selecionados.</div>
+        ) : filteredTasks.map((task) => {
           const StatusIcon = statusIcons[task.status];
+          const taskArea = areas.find(a => a.id === task.area_id);
+          const taskRole = roles.find(r => r.id === task.role_id);
           
           return (
             <div 
@@ -103,14 +167,26 @@ export default function Tasks() {
               onClick={() => setEditingTask(task)}
             >
               <div className="flex justify-between items-start mb-4">
-                <span className={cn(
-                  "px-2 py-1 rounded text-[10px] font-bold uppercase",
-                  priorityColors[task.priority]
-                )}>
-                  {task.priority}
-                </span>
+                <div className="flex flex-wrap gap-2">
+                  <span className={cn(
+                    "px-2 py-1 rounded text-[10px] font-bold uppercase",
+                    priorityColors[task.priority]
+                  )}>
+                    {task.priority}
+                  </span>
+                  {taskArea && (
+                    <span className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-blue-500/10 text-blue-400">
+                      {taskArea.name}
+                    </span>
+                  )}
+                  {taskRole && (
+                    <span className="px-2 py-1 rounded text-[10px] font-bold uppercase bg-purple-500/10 text-purple-400">
+                      {taskRole.name}
+                    </span>
+                  )}
+                </div>
                 <div className={cn(
-                  "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase",
+                  "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase shrink-0",
                   task.status === 'DONE' ? 'bg-emerald-500/10 text-emerald-500' :
                   task.status === 'IN_PROGRESS' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-slate-800 text-slate-400'
                 )}>
@@ -162,7 +238,7 @@ export default function Tasks() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-2">Status</label>
                   <select
@@ -185,6 +261,31 @@ export default function Tasks() {
                     <option value="LOW">BAIXA</option>
                     <option value="MEDIUM">MÉDIA</option>
                     <option value="HIGH">ALTA</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Área</label>
+                  <select
+                    value={editingTask.area_id || ''}
+                    onChange={(e) => setEditingTask({ ...editingTask, area_id: e.target.value || null })}
+                    className="w-full bg-black border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">Nenhuma</option>
+                    {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Cargo Alvo</label>
+                  <select
+                    value={editingTask.role_id || ''}
+                    onChange={(e) => setEditingTask({ ...editingTask, role_id: e.target.value || null })}
+                    className="w-full bg-black border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">Nenhum</option>
+                    {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>
                 <div>
