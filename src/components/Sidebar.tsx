@@ -7,7 +7,8 @@ import {
   CheckSquare, 
   Database, 
   LogOut,
-  Terminal
+  Terminal,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -25,6 +26,7 @@ export default function Sidebar() {
   if (user?.role === 'ADMIN_MASTER') {
     navItems.push({ to: '/users', icon: Users, label: 'Usuários' });
     navItems.push({ to: '/team-settings', icon: Terminal, label: 'Equipe' });
+    navItems.push({ to: '/groups', icon: MessageSquare, label: 'Grupos' });
   }
 
   return (
