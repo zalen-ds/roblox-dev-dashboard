@@ -1,7 +1,8 @@
-export type UserRole = 'ADMIN_MASTER' | 'USER';
+export type UserRole = 'ADMIN_MASTER' | 'DEVELOPER' | 'MODELER' | 'UI_DESIGNER' | 'USER';
 export type UserStatus = 'PENDING' | 'APPROVED' | 'DENIED';
-export type TaskArea = 'Script' | 'UI' | 'Map';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export type UserArea = 'Scripting' | 'Building' | 'UI' | 'Management' | 'Geral';
 
 export interface User {
   id: string;
@@ -9,20 +10,42 @@ export interface User {
   password?: string;
   status: UserStatus;
   role: UserRole;
+  area: UserArea;
   can_edit_db: boolean;
   needs_password_change: boolean;
+  created_at?: string;
 }
 
 export interface Task {
   id: string;
   title: string;
-  area: TaskArea;
+  description: string;
   status: TaskStatus;
-  lua_code: string;
+  priority: TaskPriority;
+  assigned_to: string | null;
+  created_at?: string;
 }
 
-export interface DataStoreItem {
+export interface Message {
   id: string;
-  key: string;
-  value: any;
+  sender_username: string;
+  content: string;
+  channel: string;
+  created_at: string;
+}
+
+export interface Note {
+  id: string;
+  user_id: string;
+  username: string;
+  content: string;
+  updated_at: string;
+}
+
+export interface DataStoreEntry {
+  id: string;
+  player_id: number;
+  player_name: string;
+  data: any;
+  updated_at: string;
 }
