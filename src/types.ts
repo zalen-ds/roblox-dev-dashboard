@@ -75,3 +75,13 @@ export interface DataStoreEntry {
   data: any;
   updated_at: string;
 }
+
+export interface SystemLog {
+  id: string;
+  action: string;
+  category: 'AUTH' | 'CHAT' | 'GROUP' | 'USER' | 'TEAM' | 'SYSTEM';
+  details: string;
+  user_id: string;
+  username: string;
+  created_at: string;
+}
