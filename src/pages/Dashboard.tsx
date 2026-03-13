@@ -7,8 +7,10 @@ import {
   Database, 
   Activity,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Terminal
 } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -18,18 +20,24 @@ export default function Dashboard() {
     pendingTasks: 0
   });
 
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+
   useEffect(() => {
     async function fetchStats() {
       const [
         { count: usersCount },
         { count: tasksCount },
         { count: dsCount },
-        { count: pendingCount }
+        { count: pendingCount },
+        { data: recentTasks },
+        { data: recentMessages }
       ] = await Promise.all([
         supabase.from('users').select('*', { count: 'exact', head: true }),
         supabase.from('tasks').select('*', { count: 'exact', head: true }),
         supabase.from('datastore_entries').select('*', { count: 'exact', head: true }),
-        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'TODO')
+        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'TODO'),
+        supabase.from('tasks').select('*').order('created_at', { ascending: false }).limit(3),
+        supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(3)
       ]);
 
       setStats({
@@ -38,6 +46,15 @@ export default function Dashboard() {
         datastore: dsCount || 0,
         pendingTasks: pendingCount || 0
       });
+
+      // Combine and sort recent activity
+      const activity = [
+        ...(recentTasks || []).map(t => ({ ...t, type: 'task' })),
+        ...(recentMessages || []).map(m => ({ ...m, type: 'message' }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
+
+      setRecentActivity(activity);
     }
 
     fetchStats();
@@ -78,16 +95,31 @@ export default function Dashboard() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <h2 className="text-xl font-bold text-white mb-6">Atividade Recente</h2>
           <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
+            {recentActivity.length === 0 ? (
+              <p className="text-slate-500 text-sm italic">Nenhuma atividade recente.</p>
+            ) : recentActivity.map((item, i) => (
               <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-black/40 border border-slate-800/50">
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-slate-400" />
+                <div className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center",
+                  item.type === 'task' ? "bg-blue-500/10" : "bg-emerald-500/10"
+                )}>
+                  {item.type === 'task' ? (
+                    <CheckSquare className="w-5 h-5 text-blue-500" />
+                  ) : (
+                    <Terminal className="w-5 h-5 text-emerald-500" />
+                  )}
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-white font-medium">Sistema operacional estável</p>
-                  <p className="text-xs text-slate-500">Monitoramento em tempo real ativo</p>
+                  <p className="text-sm text-white font-medium">
+                    {item.type === 'task' ? `Nova tarefa: ${item.title}` : `Mensagem de ${item.sender_username}`}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate max-w-[200px]">
+                    {item.type === 'task' ? item.description : item.content}
+                  </p>
                 </div>
-                <span className="text-[10px] text-slate-600 font-mono">AGORA</span>
+                <span className="text-[10px] text-slate-600 font-mono">
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
             ))}
           </div>
