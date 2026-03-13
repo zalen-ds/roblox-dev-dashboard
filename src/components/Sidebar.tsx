@@ -17,6 +17,8 @@ export default function Sidebar() {
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/tasks', icon: CheckSquare, label: 'Tarefas' },
+    { to: '/chat', icon: Terminal, label: 'Chat' },
+    { to: '/notes', icon: Database, label: 'Notas' },
     { to: '/datastore', icon: Database, label: 'DataStore' },
   ];
 
