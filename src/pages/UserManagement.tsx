@@ -27,6 +27,22 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers();
     fetchMetadata();
+
+    // Real-time subscriptions
+    const usersSub = supabase
+      .channel('users-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchUsers())
+      .subscribe();
+
+    const userAreasSub = supabase
+      .channel('user-areas-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_areas' }, () => fetchUsers())
+      .subscribe();
+
+    return () => {
+      usersSub.unsubscribe();
+      userAreasSub.unsubscribe();
+    };
   }, []);
 
   async function fetchUsers() {
