@@ -21,6 +21,16 @@ export default function TeamSettings() {
 
   useEffect(() => {
     fetchData();
+
+    const subscription = supabase
+      .channel('team-settings-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'roles' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'areas' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function fetchData() {
@@ -46,6 +56,9 @@ export default function TeamSettings() {
     if (!error) {
       setEditingRole(null);
       fetchData();
+    } else {
+      console.error('Error saving role:', error);
+      alert(`Erro ao salvar cargo: ${error.message}`);
     }
   }
 
@@ -60,6 +73,9 @@ export default function TeamSettings() {
     if (!error) {
       setEditingArea(null);
       fetchData();
+    } else {
+      console.error('Error saving area:', error);
+      alert(`Erro ao salvar área: ${error.message}`);
     }
   }
 
