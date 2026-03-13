@@ -31,6 +31,22 @@ export default function Tasks() {
     fetchTasks();
     fetchUsers();
     fetchMetadata();
+
+    // Real-time subscription for tasks
+    const subscription = supabase
+      .channel('tasks-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'tasks' 
+      }, () => {
+        fetchTasks(); // Refresh list on any change
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function fetchTasks() {
