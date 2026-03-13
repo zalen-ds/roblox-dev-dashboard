@@ -47,6 +47,28 @@ export default function UserManagement() {
     }
   }
 
+  async function handleRoleChange(userId: string, role: User['role']) {
+    const { error } = await supabase
+      .from('users')
+      .update({ role })
+      .eq('id', userId);
+    
+    if (!error) {
+      setUsers(users.map(u => u.id === userId ? { ...u, role } : u));
+    }
+  }
+
+  async function handleAreaChange(userId: string, area: User['area']) {
+    const { error } = await supabase
+      .from('users')
+      .update({ area })
+      .eq('id', userId);
+    
+    if (!error) {
+      setUsers(users.map(u => u.id === userId ? { ...u, area } : u));
+    }
+  }
+
   async function handleResetPassword(userId: string, username: string) {
     const newPassword = generateRandomPassword(8);
     const { error } = await supabase
@@ -91,7 +113,8 @@ export default function UserManagement() {
           <thead>
             <tr className="bg-black/50 border-b border-slate-800">
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Usuário</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Role</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cargo</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Área</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Edição DB</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Ações</th>
@@ -100,11 +123,11 @@ export default function UserManagement() {
           <tbody className="divide-y divide-slate-800">
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-500">Carregando usuários...</td>
+                <td colSpan={6} className="px-6 py-12 text-center text-slate-500">Carregando usuários...</td>
               </tr>
             ) : filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-500">Nenhum usuário encontrado.</td>
+                <td colSpan={6} className="px-6 py-12 text-center text-slate-500">Nenhum usuário encontrado.</td>
               </tr>
             ) : filteredUsers.map((u) => (
               <tr key={u.id} className="hover:bg-black/20 transition-colors">
@@ -117,11 +140,30 @@ export default function UserManagement() {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
-                    u.role === 'ADMIN_MASTER' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'
-                  }`}>
-                    {u.role}
-                  </span>
+                  <select
+                    value={u.role}
+                    onChange={(e) => handleRoleChange(u.id, e.target.value as User['role'])}
+                    className="bg-black border border-slate-800 rounded px-2 py-1 text-[10px] font-bold uppercase text-emerald-500 focus:outline-none"
+                  >
+                    <option value="ADMIN_MASTER">ADMIN MASTER</option>
+                    <option value="DEVELOPER">DEVELOPER</option>
+                    <option value="MODELER">MODELER</option>
+                    <option value="UI_DESIGNER">UI DESIGNER</option>
+                    <option value="USER">USER</option>
+                  </select>
+                </td>
+                <td className="px-6 py-4">
+                  <select
+                    value={u.area}
+                    onChange={(e) => handleAreaChange(u.id, e.target.value as User['area'])}
+                    className="bg-black border border-slate-800 rounded px-2 py-1 text-[10px] font-bold uppercase text-blue-500 focus:outline-none"
+                  >
+                    <option value="Scripting">Scripting</option>
+                    <option value="Building">Building</option>
+                    <option value="UI">UI</option>
+                    <option value="Management">Management</option>
+                    <option value="Geral">Geral</option>
+                  </select>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
