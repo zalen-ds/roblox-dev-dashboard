@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { User, Role, Area } from '../types';
 import { generateRandomPassword } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { 
   UserPlus, 
   ShieldCheck, 
@@ -32,11 +33,20 @@ export default function UserManagement() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('users')
-      .select('*')
+      .select(`
+        *,
+        user_areas (
+          area_id
+        )
+      `)
       .order('username', { ascending: true });
     
     if (!error && data) {
-      setUsers(data);
+      const transformedUsers = data.map((u: any) => ({
+        ...u,
+        areas: u.user_areas?.map((ua: any) => areas.find(a => a.id === ua.area_id)).filter(Boolean) || []
+      }));
+      setUsers(transformedUsers);
     }
     setIsLoading(false);
   }
@@ -58,6 +68,9 @@ export default function UserManagement() {
     
     if (!error) {
       setUsers(users.map(u => u.id === userId ? { ...u, status } : u));
+    } else {
+      console.error('Error updating status:', error);
+      alert(`Erro ao atualizar status: ${error.message}`);
     }
   }
 
@@ -72,20 +85,27 @@ export default function UserManagement() {
     
     if (!error) {
       setUsers(users.map(u => u.id === userId ? { ...u, role_id: roleId, role: role.name } : u));
+    } else {
+      console.error('Error updating role:', error);
+      alert(`Erro ao atualizar cargo: ${error.message}`);
     }
   }
 
-  async function handleAreaChange(userId: string, areaId: string) {
-    const area = areas.find(a => a.id === areaId);
-    if (!area) return;
-
-    const { error } = await supabase
-      .from('users')
-      .update({ area_id: areaId, area: area.name })
-      .eq('id', userId);
-    
-    if (!error) {
-      setUsers(users.map(u => u.id === userId ? { ...u, area_id: areaId, area: area.name } : u));
+  async function toggleArea(userId: string, areaId: string, isAssigned: boolean) {
+    if (isAssigned) {
+      const { error } = await supabase
+        .from('user_areas')
+        .delete()
+        .eq('user_id', userId)
+        .eq('area_id', areaId);
+      
+      if (!error) fetchUsers();
+    } else {
+      const { error } = await supabase
+        .from('user_areas')
+        .insert([{ user_id: userId, area_id: areaId }]);
+      
+      if (!error) fetchUsers();
     }
   }
 
@@ -170,14 +190,26 @@ export default function UserManagement() {
                   </select>
                 </td>
                 <td className="px-6 py-4">
-                  <select
-                    value={u.area_id || ''}
-                    onChange={(e) => handleAreaChange(u.id, e.target.value)}
-                    className="bg-black border border-slate-800 rounded px-2 py-1 text-[10px] font-bold uppercase text-blue-500 focus:outline-none"
-                  >
-                    <option value="">SEM ÁREA</option>
-                    {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </select>
+                  <div className="flex flex-wrap gap-1 max-w-[200px]">
+                    {areas.map(area => {
+                      const isAssigned = u.areas?.some(a => a.id === area.id);
+                      return (
+                        <button
+                          key={area.id}
+                          onClick={() => toggleArea(u.id, area.id, !!isAssigned)}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[9px] font-bold uppercase transition-colors",
+                            isAssigned 
+                              ? "bg-blue-500 text-white" 
+                              : "bg-slate-800 text-slate-500 hover:bg-slate-700"
+                          )}
+                        >
+                          {area.name}
+                        </button>
+                      );
+                    })}
+                    {areas.length === 0 && <span className="text-[10px] text-slate-600 italic">Nenhuma área</span>}
+                  </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
